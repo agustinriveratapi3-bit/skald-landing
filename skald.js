@@ -87,6 +87,9 @@ function loadImg(src, target, idx) {
 }
 
 async function preload() {
+  // Minimum display time so the loader is always visible
+  const minTime = new Promise(r => setTimeout(r, 1800));
+
   // Critical first
   await Promise.all([
     loadImg(`assets/skald/frame_001.webp`, skaldImgs, 0),
@@ -104,7 +107,7 @@ async function preload() {
   for (let i = 0; i < TOTAL_CLIENT; i++) {
     rest.push(loadImg(`assets/client/frame_${pad3(i + 1)}.webp`, clientImgs, i));
   }
-  await Promise.all(rest);
+  await Promise.all([...rest, minTime]);
 }
 
 // ── canvas ───────────────────────────────────────────────
@@ -174,6 +177,20 @@ function drawCoverToCanvas(img, cw, ch, c) {
 function drawBlack() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+}
+
+// Shown when image sequences aren't loaded yet — typographic placeholder
+function drawPlaceholder() {
+  const cw = window.innerWidth;
+  const ch = window.innerHeight;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, cw, ch);
+  const size = Math.min(cw * 0.22, ch * 0.28, 220);
+  ctx.font = `700 ${size}px "Geist", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(245,243,239,0.08)';
+  ctx.fillText('SKALD', cw / 2, ch / 2);
 }
 
 // ── timecode ─────────────────────────────────────────────
@@ -295,6 +312,7 @@ function tick() {
   }
 
   if (frameImg) drawCover(frameImg);
+  else if (stageActive('hero-idle') || stageActive('rotation') || stageActive('hand')) drawPlaceholder();
   else drawBlack();
 
   // ── client video canvas (lives inside portal card body, acts like a photo) ──
