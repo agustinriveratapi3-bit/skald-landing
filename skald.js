@@ -92,20 +92,20 @@ async function preload() {
 
   // Critical first
   await Promise.all([
-    loadImg(`assets/skald/frame_001.webp`, skaldImgs, 0),
-    loadImg(`assets/skald/frame_180.webp`, skaldImgs, 179),
+    loadImg(`project/assets/skald/frame_001.webp`, skaldImgs, 0),
+    loadImg(`project/assets/skald/frame_180.webp`, skaldImgs, 179),
   ]);
 
   // Everything else in parallel
   const rest = [];
   for (let i = 1; i < TOTAL_SKALD - 1; i++) {
-    rest.push(loadImg(`assets/skald/frame_${pad3(i + 1)}.webp`, skaldImgs, i));
+    rest.push(loadImg(`project/assets/skald/frame_${pad3(i + 1)}.webp`, skaldImgs, i));
   }
   for (let i = 0; i < TOTAL_HAND; i++) {
-    rest.push(loadImg(`assets/hand/hand_${pad3(i + 1)}.jpg`, handImgs, i));
+    rest.push(loadImg(`project/assets/hand/hand_${pad3(i + 1)}.jpg`, handImgs, i));
   }
   for (let i = 0; i < TOTAL_CLIENT; i++) {
-    rest.push(loadImg(`assets/client/frame_${pad3(i + 1)}.webp`, clientImgs, i));
+    rest.push(loadImg(`project/assets/client/frame_${pad3(i + 1)}.webp`, clientImgs, i));
   }
   await Promise.all([...rest, minTime]);
 }
