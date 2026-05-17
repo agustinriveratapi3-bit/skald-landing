@@ -548,6 +548,7 @@ em {
   position: fixed;
   bottom: calc(var(--safe) + 76px);
   left: 50%;
+  z-index: 10;
   transform: translateX(-50%) translateY(8px);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -570,6 +571,7 @@ em {
   position: fixed;
   bottom: calc(var(--safe) + 36px);
   left: 50%;
+  z-index: 10;
   transform: translateX(-50%);
   font-family: var(--font-mono);
   font-size: 10px;
