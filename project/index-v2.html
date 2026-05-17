@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SKALD — Departamento creativo on-demand</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+
+<link rel="preload" as="image" href="assets/skald/frame_001.webp" />
+<link rel="preload" as="image" href="assets/skald/frame_180.webp" />
+
+<link rel="stylesheet" href="skald.css" />
+</head>
+<body>
+
+<!-- ───────────── LOADER ───────────── -->
+<div class="loader" id="loader">
+  <div class="loader-inner">
+    <div class="loader-brand">SKALD</div>
+    <div class="loader-bar"><div class="loader-bar-fill" id="loaderFill"></div></div>
+    <div class="loader-status" id="loaderStatus">Cargando · 0%</div>
+  </div>
+</div>
+
+<!-- ───────────── NAVBAR ───────────── -->
+<header class="nav" id="nav">
+  <a href="#top" class="nav-brand">SKALD</a>
+  <nav class="nav-links">
+    <a href="#manifiesto">Manifiesto</a>
+    <a href="#proceso">Proceso</a>
+    <a href="#contacto">Contacto</a>
+  </nav>
+</header>
+
+<!-- ───────────── STICKY CANVAS STAGE ───────────── -->
+<div class="stage" id="stage">
+  <canvas id="canvas" aria-hidden="true"></canvas>
+</div>
+
+<!-- ───────────── TELEMETRY (timecode) ───────────── -->
+<div class="telemetry" id="telemetry">
+  <span class="tc-label">SCROLL</span>
+  <span class="tc" id="tc">00:00:00:00</span>
+</div>
+
+<!-- ───────────── CURSOR ───────────── -->
+<div class="cursor" id="cursor"></div>
+
+<!-- ───────────── HERO OVERLAYS (visible on load) ───────────── -->
+<div class="hero-overlay" id="heroOverlay">
+  <div class="hero-label hero-label-left">
+    <div class="line"></div>
+    <span>MONTEVIDEO · MAD</span>
+  </div>
+  <div class="hero-label hero-label-right">
+    <span>DEPT. CREATIVO / N° 001</span>
+    <div class="line"></div>
+  </div>
+  <div class="hero-claim" id="heroClaim">
+    POST-PRODUCCIÓN · COMO SISTEMA
+  </div>
+  <div class="hero-scroll-hint" id="heroHint">
+    <span>desliza</span>
+    <svg width="10" height="14" viewBox="0 0 10 14" fill="none"><path d="M5 1V13M1 9l4 4 4-4" stroke="currentColor" stroke-width="1"/></svg>
+  </div>
+</div>
+
+<!-- ───────────── PHRASE SCENE (from right → center → corner) ───────────── -->
+<div class="phrase-stage" id="phraseStage">
+  <h1 class="phrase" id="phrase">
+    El problema <em>no es</em> el editor.
+  </h1>
+</div>
+
+<!-- Phrase pinned in top-left corner after migration -->
+<div class="phrase-corner" id="phraseCorner">
+  <span class="ch-label">CAP. 02 / DIAGNÓSTICO</span>
+  <span class="phrase-corner-text">El problema no es el editor.</span>
+</div>
+
+<!-- ───────────── CARDS RAIL SCENE ───────────── -->
+<div class="cards-stage" id="cardsStage">
+  <!-- Frame target (the rectangle where active card lands) -->
+  <div class="card-frame" id="cardFrame">
+    <span class="card-frame-corner tl"></span>
+    <span class="card-frame-corner tr"></span>
+    <span class="card-frame-corner bl"></span>
+    <span class="card-frame-corner br"></span>
+  </div>
+
+  <!-- Cards (positioned via JS based on scroll progress) -->
+  <div class="card" data-i="0">
+    <div class="card-meta">
+      <span>N° 001</span><span>2.39:1</span>
+    </div>
+    <div class="card-body">
+      <span class="card-placeholder">[ Brand Film · placeholder ]</span>
+    </div>
+    <div class="card-foot">
+      <span class="card-title">Síntoma 01</span>
+      <span class="card-tag">Volumen sin sistema</span>
+    </div>
+  </div>
+
+  <div class="card" data-i="1">
+    <div class="card-meta">
+      <span>N° 002</span><span>16:9</span>
+    </div>
+    <div class="card-body">
+      <span class="card-placeholder">[ Spot · placeholder ]</span>
+    </div>
+    <div class="card-foot">
+      <span class="card-title">Síntoma 02</span>
+      <span class="card-tag">Editores sin visión</span>
+    </div>
+  </div>
+
+  <div class="card" data-i="2">
+    <div class="card-meta">
+      <span>N° 003</span><span>9:16</span>
+    </div>
+    <div class="card-body">
+      <span class="card-placeholder">[ Social · placeholder ]</span>
+    </div>
+    <div class="card-foot">
+      <span class="card-title">Síntoma 03</span>
+      <span class="card-tag">Calidad inconsistente</span>
+    </div>
+  </div>
+
+  <!-- Portal card (last one — becomes the immersive video) -->
+  <div class="card card-portal" data-i="3">
+    <div class="card-meta">
+      <span>N° 004</span><span>PORTAL</span>
+    </div>
+    <div class="card-body card-body-portal" id="portalBody">
+      <!-- Placeholder image: dark workspace with figure silhouette (SVG composition) -->
+      <svg class="portal-art" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <radialGradient id="glow" cx="50%" cy="35%" r="50%">
+            <stop offset="0%" stop-color="#1a1a1f" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0a0a0c"/>
+            <stop offset="100%" stop-color="#000"/>
+          </linearGradient>
+          <pattern id="grain" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="4" fill="#000"/>
+            <circle cx="2" cy="2" r="0.3" fill="rgba(255,255,255,0.04)"/>
+          </pattern>
+        </defs>
+        <rect width="800" height="1000" fill="url(#floor)"/>
+        <rect width="800" height="1000" fill="url(#glow)" opacity="0.5"/>
+        <!-- Monitor glow -->
+        <rect x="280" y="380" width="240" height="140" fill="rgba(180,200,240,0.18)" rx="4"/>
+        <rect x="295" y="395" width="210" height="110" fill="rgba(60,80,120,0.4)"/>
+        <!-- Slumped silhouette -->
+        <path d="M 320 540 C 320 510, 360 470, 400 470 C 440 470, 480 510, 480 540 L 480 720 C 480 760, 460 800, 400 800 C 340 800, 320 760, 320 720 Z" fill="#050505"/>
+        <ellipse cx="400" cy="470" rx="42" ry="48" fill="#050505"/>
+        <!-- Desk -->
+        <rect x="120" y="720" width="560" height="280" fill="#0a0a0c"/>
+        <rect x="120" y="720" width="560" height="3" fill="rgba(255,255,255,0.05)"/>
+        <!-- Scattered windows on desk -->
+        <rect x="160" y="780" width="120" height="80" fill="rgba(255,255,255,0.04)" rx="2"/>
+        <rect x="540" y="800" width="100" height="60" fill="rgba(255,255,255,0.03)" rx="2"/>
+        <rect width="800" height="1000" fill="url(#grain)"/>
+      </svg>
+
+      <!-- Arrow + label that appears when fully expanded -->
+      <div class="portal-pointer" id="portalPointer">
+        <svg class="arrow-svg" viewBox="0 0 200 120" aria-hidden="true">
+          <path id="arrowPath" d="M 20 100 Q 60 40, 120 50 L 170 50" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          <path d="M 165 44 L 175 50 L 165 56" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="pointer-label"><em>Esto</em> sos vos.</span>
+      </div>
+
+      <!-- Problem cards on left side -->
+      <div class="problems" id="problems">
+        <div class="problem" data-i="0">
+          <span class="problem-num">01</span>
+          <span class="problem-text">Tus editores no cumplen con los tiempos.</span>
+        </div>
+        <div class="problem" data-i="1">
+          <span class="problem-num">02</span>
+          <span class="problem-text">No comparten tu visión, ni se adaptan a ella.</span>
+        </div>
+        <div class="problem" data-i="2">
+          <span class="problem-num">03</span>
+          <span class="problem-text">No escalan al volumen que tu marca necesita.</span>
+        </div>
+        <div class="problem" data-i="3">
+          <span class="problem-num">04</span>
+          <span class="problem-text">La calidad cae cuando la entrega sube.</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-foot card-foot-portal">
+      <span class="card-title">El cliente</span>
+      <span class="card-tag">Caso de estudio</span>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── SOLUTION SCENE (SKALD appears as solution) ───────────── -->
+<div class="solution-stage" id="solutionStage">
+  <div class="solution-eyebrow">
+    <span>La solución</span>
+  </div>
+  <h2 class="solution-text">
+    Un <em>departamento creativo</em> instalado en tu marca.
+  </h2>
+  <div class="solution-meta">
+    <span>SKALD · STANDING DEPT.</span>
+    <span>EST. 2024</span>
+  </div>
+</div>
+
+<!-- ───────────── SCROLL SPACERS (drive the engine via document height) ───────────── -->
+<div class="spacers" aria-hidden="true">
+  <div class="spacer" style="height: 50vh"   data-stage="hero-idle"></div>
+  <div class="spacer" style="height: 360vh"  data-stage="rotation"></div>
+  <div class="spacer" style="height: 120vh"  data-stage="hand"></div>
+  <div class="spacer" style="height: 70vh"   data-stage="black"></div>
+  <div class="spacer" style="height: 140vh"  data-stage="phrase-in"></div>
+  <div class="spacer" style="height: 80vh"   data-stage="phrase-migrate"></div>
+  <div class="spacer" style="height: 230vh"  data-stage="cards-rail"></div>
+  <div class="spacer" style="height: 200vh"  data-stage="portal-grow"></div>
+  <div class="spacer" style="height: 200vh"  data-stage="portal-problems"></div>
+  <div class="spacer" style="height: 100vh"  data-stage="solution"></div>
+  <div class="spacer" style="height: 50vh"   data-stage="end"></div>
+</div>
+
+<script src="skald.js" type="module"></script>
+</body>
+</html>

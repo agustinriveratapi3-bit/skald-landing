@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SKALD — Post-production studio</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg: #08080a;
+    --bg-warm: #0d0a08;
+    --ink: #f3ede2;
+    --ink-dim: rgba(243, 237, 226, 0.55);
+    --ink-faint: rgba(243, 237, 226, 0.22);
+    --accent: #d9a373;     /* warm amber, used sparingly */
+    --rule: rgba(243, 237, 226, 0.14);
+    --grid: rgba(243, 237, 226, 0.06);
+    --safe: 28px;          /* viewport padding */
+    --nav-h: 64px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter Tight', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    overflow-x: hidden;
+    cursor: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  em { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; letter-spacing: 0; }
+
+  /* ── cursor ───────────────────────────── */
+  .cursor-dot, .cursor-ring {
+    position: fixed;
+    top: 0; left: 0;
+    pointer-events: none;
+    z-index: 200;
+    transform: translate(-50%, -50%);
+    mix-blend-mode: difference;
+  }
+  .cursor-dot {
+    width: 4px; height: 4px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform .15s ease-out;
+  }
+  .cursor-ring {
+    width: 32px; height: 32px;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 50%;
+    transition: width .25s ease, height .25s ease, opacity .25s ease;
+  }
+  .cursor-ring.hover { width: 64px; height: 64px; }
+
+  /* spotlight that follows cursor — gives the scene a sense of light */
+  .spotlight {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(
+      400px 400px at var(--mx, 50%) var(--my, 50%),
+      rgba(217, 163, 115, 0.06),
+      transparent 70%
+    );
+    transition: opacity .4s ease;
+  }
+
+  /* ── nav ──────────────────────────────── */
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--nav-h);
+    padding: 0 var(--safe);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    mix-blend-mode: difference;
+  }
+  .nav .brand {
+    font-weight: 700;
+    letter-spacing: 0.22em;
+  }
+  .nav ul {
+    display: flex;
+    gap: 32px;
+    list-style: none;
+    margin: 0; padding: 0;
+  }
+  .nav a {
+    position: relative;
+    opacity: 0.65;
+    transition: opacity .2s;
+  }
+  .nav a:hover { opacity: 1; }
+  .nav a.active {
+    opacity: 1;
+  }
+  .nav a.active::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    bottom: -8px;
+    border-bottom: 1px dashed currentColor;
+  }
+
+  .ribbon {
+    position: fixed;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    color: var(--ink-dim);
+    z-index: 60;
+    padding: 12px 6px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: rgba(8,8,10,0.4);
+    backdrop-filter: blur(6px);
+  }
+
+  /* ── sticky 3D stage ──────────────────── */
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .stage canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
+  /* annotations layered over the canvas */
+  .annot {
+    position: absolute;
+    color: var(--ink-dim);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity .6s ease;
+    pointer-events: none;
+  }
+  .annot.show { opacity: 1; }
+
+  .annot-footnote {
+    bottom: var(--safe);
+    right: calc(var(--safe) + 32px);
+    text-align: right;
+    line-height: 1.4;
+  }
+  .annot-footnote .ast { color: var(--accent); }
+
+  .annot-formula {
+    bottom: var(--safe);
+    left: var(--safe);
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 18px;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1.1;
+  }
+  .annot-formula .label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  /* bounding box overlay around the centerpiece */
+  .bbox {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64vmin;
+    height: 22vmin;
+    border: 1px dashed var(--rule);
+    opacity: 0;
+    transition: opacity .8s ease;
+    pointer-events: none;
+  }
+  .bbox.show { opacity: 1; }
+  .bbox::before, .bbox::after {
+    content: '';
+    position: absolute;
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+  .bbox::before { top: -4px; left: -4px; }
+  .bbox::after  { bottom: -4px; right: -4px; }
+  .bbox .corner {
+    position: absolute;
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+  .bbox .corner.tr { top: -4px; right: -4px; }
+  .bbox .corner.bl { bottom: -4px; left: -4px; }
+  .bbox .label {
+    position: absolute;
+    top: -28px; left: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  /* tiny corner crosshair telemetry */
+  .telemetry {
+    position: fixed;
+    bottom: var(--safe);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .telemetry .chev {
+    width: 10px; height: 10px;
+    border-right: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    transform: rotate(45deg);
+    margin-bottom: 4px;
+    opacity: 0.7;
+    animation: bounce 2.2s ease-in-out infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: rotate(45deg) translate(0, 0); }
+    50% { transform: rotate(45deg) translate(3px, 3px); }
+  }
+
+  /* ── chapter layout ───────────────────── */
+  main {
+    position: relative;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .chapter {
+    position: relative;
+    min-height: 100vh;
+    padding: calc(var(--nav-h) + 20px) var(--safe) 60px;
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 1.6fr) minmax(220px, 1fr);
+    gap: 40px;
+  }
+  .chapter > * { pointer-events: auto; }
+
+  .col-left { align-self: end; }
+  .col-mid  { align-self: center; text-align: center; }
+  .col-right { align-self: end; }
+
+  .label {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--rule);
+    margin-bottom: 14px;
+    min-width: 180px;
+  }
+
+  .body {
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--ink);
+    max-width: 30ch;
+    text-wrap: pretty;
+  }
+
+  .caption {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-dim);
+    max-width: 26ch;
+  }
+
+  /* claim sitting at the top of hero */
+  .top-claim {
+    position: absolute;
+    top: calc(var(--nav-h) + 20px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .display {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    font-size: clamp(48px, 9vw, 144px);
+    line-height: 0.92;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .display em {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* hero — claim only; the wordmark is in WebGL */
+  #intro .col-left   { padding-bottom: 50px; }
+  #intro .col-right  { padding-bottom: 50px; text-align: right; }
+  #intro .col-right .body { margin-left: auto; }
+
+  /* manifesto chapter */
+  #manifesto .col-mid {
+    text-align: left;
+    align-self: center;
+  }
+  #manifesto .display { text-align: left; }
+  #manifesto .col-left, #manifesto .col-right { align-self: end; }
+  #manifesto .ast-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-top: 18px;
+  }
+
+  /* craft chapter */
+  #craft { padding-top: 140px; }
+  #craft .col-mid { text-align: left; }
+  #craft .ask {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 18px;
+  }
+  #craft .ask::before {
+    content: '';
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    vertical-align: -1px;
+    margin-right: 8px;
+  }
+
+  /* work chapter — gallery rail */
+  #work {
+    grid-template-columns: 1fr;
+    align-items: end;
+    padding-bottom: 0;
+  }
+  #work .col-mid { width: 100%; }
+  #work h2 {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 500;
+    font-size: clamp(28px, 3.4vw, 48px);
+    letter-spacing: -0.025em;
+    margin: 0 0 36px 0;
+    text-align: left;
+  }
+  #work h2 em { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; }
+  .reel {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .reel .tile {
+    aspect-ratio: 4 / 5;
+    border: 1px dashed var(--rule);
+    background:
+      repeating-linear-gradient(45deg, rgba(243,237,226,0.03) 0 2px, transparent 2px 9px),
+      linear-gradient(180deg, rgba(217,163,115,0.05), rgba(8,8,10,0));
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    transition: transform .4s ease, border-color .4s ease;
+  }
+  .reel .tile:hover {
+    border-color: var(--accent);
+    transform: translateY(-4px);
+  }
+  .reel .tile .top { display: flex; justify-content: space-between; }
+  .reel .tile .ar { color: var(--accent); }
+  .reel .tile .ttl { color: var(--ink); font-size: 11px; letter-spacing: 0.02em; }
+
+  /* features chapter — split layout */
+  #features {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    min-height: 200vh;
+    padding-top: 120px;
+  }
+  #features .feat {
+    grid-column: 1;
+    align-self: end;
+    max-width: 36ch;
+    padding-bottom: 80px;
+    border-top: 1px solid var(--rule);
+    padding-top: 18px;
+  }
+  #features .feat + .feat { margin-top: 60px; }
+  #features .feat .lab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  #features .feat h3 {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 600;
+    font-size: clamp(28px, 3.4vw, 48px);
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    margin: 0 0 14px 0;
+  }
+  #features .feat h3 em { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; }
+  #features .feat p {
+    color: var(--ink-dim);
+    font-size: 15px;
+    margin: 0 0 18px 0;
+  }
+  #features .feat .formula {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 22px;
+    color: var(--accent);
+  }
+  #features .feat .formula small {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-style: normal;
+    font-size: 9px;
+    color: var(--ink-faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* contact */
+  #contact {
+    grid-template-columns: 1fr 1fr;
+    min-height: 80vh;
+    align-items: end;
+    padding-bottom: 28px;
+  }
+  #contact .lo {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    font-size: 13px;
+  }
+  #contact h2 {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 500;
+    font-size: clamp(40px, 6vw, 96px);
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+    margin: 0 0 22px 0;
+  }
+  #contact h2 em { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; }
+  #contact a.cta {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 14px 22px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+  #contact a.cta:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  #contact .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.7;
+  }
+  #contact .meta .row { display: flex; justify-content: flex-end; gap: 22px; }
+
+  /* reveal animations */
+  .reveal {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(14px);
+    transition: opacity 1s cubic-bezier(.2,.7,.2,1), filter 1s, transform 1s;
+  }
+  .reveal.in {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+
+  /* glow overlay used by manifesto chapter */
+  .glow-overlay {
+    position: fixed; inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+      radial-gradient(60vmax 50vmax at 50% 50%, rgba(217,163,115,0.08), transparent 60%);
+    opacity: 0;
+    transition: opacity 1s ease;
+  }
+  .glow-overlay.on { opacity: 1; }
+
+  /* background grid — visible only in features chapter */
+  .grid-bg {
+    position: fixed; inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity: 0;
+    transition: opacity 1s ease;
+    mask-image: radial-gradient(70vmax 70vmax at 50% 50%, #000 30%, transparent 75%);
+  }
+  .grid-bg.on { opacity: 1; }
+
+  /* mobile guard */
+  @media (max-width: 900px) {
+    .chapter {
+      grid-template-columns: 1fr;
+      gap: 18px;
+      padding: calc(var(--nav-h) + 60px) 20px 30px;
+    }
+    .nav ul { gap: 18px; }
+    .ribbon { display: none; }
+    .top-claim { font-size: 10px; }
+    .reel { grid-template-columns: repeat(2, 1fr); }
+    #features { grid-template-columns: 1fr; }
+    #contact { grid-template-columns: 1fr; }
+    #contact .meta { text-align: left; }
+    #contact .meta .row { justify-content: flex-start; }
+    body { cursor: auto; }
+    .cursor-dot, .cursor-ring { display: none; }
+  }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- nav -->
+<header class="nav">
+  <div class="brand">SKALD</div>
+  <ul>
+    <li><a href="#intro" class="active">Intro</a></li>
+    <li><a href="#manifesto">Manifesto</a></li>
+    <li><a href="#work">Work</a></li>
+    <li><a href="#features">Craft</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+</header>
+
+<aside class="ribbon">SKALD-01 · A POST-PRODUCTION INSTRUMENT</aside>
+
+<!-- cursor + lighting -->
+<div class="spotlight" id="spotlight"></div>
+<div class="cursor-ring" id="cring"></div>
+<div class="cursor-dot" id="cdot"></div>
+
+<!-- background fx -->
+<div class="grid-bg" id="gridbg"></div>
+<div class="glow-overlay" id="glow"></div>
+
+<!-- sticky 3D stage -->
+<div class="stage">
+  <canvas id="three"></canvas>
+  <div class="bbox" id="bbox">
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="label">SKALD-01 · WORDMARK · v1.0</span>
+  </div>
+  <div class="annot annot-footnote" id="ann-foot">
+    Powered by AI<span class="ast">*</span><br/>
+    <span style="opacity:.6">* and Adobe Premiere</span>
+  </div>
+  <div class="annot annot-formula" id="ann-formula">
+    τ = ∫ <em>story</em> · dt
+    <span class="label">Tension over runtime</span>
+  </div>
+</div>
+
+<!-- bottom telemetry -->
+<div class="telemetry">
+  <span class="chev"></span>
+  <span id="scrollState">SCROLL TO CONTINUE</span>
+</div>
+
+<!-- chapters -->
+<main>
+  <section class="chapter" id="intro" data-ch="1">
+    <div class="top-claim reveal">Made for stories. Cut for impact.</div>
+    <div class="col-left reveal">
+      <span class="label">CH.01 / INTRO</span>
+      <p class="caption">An independent post-production studio.<br/>Founded by editors who still watch the take 40 times.</p>
+    </div>
+    <div class="col-mid"></div>
+    <div class="col-right reveal">
+      <p class="body">SKALD shapes raw footage into something worth finishing the episode for &mdash; one frame, one cut, one decision at a time.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="manifesto" data-ch="2">
+    <div class="col-left reveal">
+      <span class="label">CH.02 / MANIFESTO</span>
+      <p class="caption">A short note on what we do and what we refuse to do.</p>
+    </div>
+    <div class="col-mid reveal">
+      <h2 class="display">Isn&rsquo;t just <em>an edit.</em></h2>
+      <p class="ast-note">* and not powered by AI</p>
+    </div>
+    <div class="col-right reveal">
+      <p class="body">It&rsquo;s the result of obsessive, frame&#8209;level decisions that no model has any business making yet.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="craft" data-ch="3">
+    <div class="col-left reveal">
+      <span class="label">CH.03 / CRAFT</span>
+      <p class="ask">Try hovering the wordmark</p>
+    </div>
+    <div class="col-mid reveal">
+      <h2 class="display">Cut <em>by hand.</em></h2>
+    </div>
+    <div class="col-right reveal">
+      <p class="body">No timeline&#8209;prompted edits. No black&#8209;box pacing. Each cut decided by a human who has watched the take, more times than they should admit.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="work" data-ch="4">
+    <div class="col-mid reveal" style="text-align:left">
+      <span class="label">CH.04 / SELECTED WORK</span>
+      <h2>Twelve frames we&rsquo;d hang <em>on the wall.</em></h2>
+      <div class="reel">
+        <div class="tile">
+          <div class="top"><span>01</span><span class="ar">2.39:1</span></div>
+          <div><div class="ttl">Northwind</div><div>Brand film</div></div>
+        </div>
+        <div class="tile">
+          <div class="top"><span>02</span><span class="ar">16:9</span></div>
+          <div><div class="ttl">Atlas Motors</div><div>Spot · 30s</div></div>
+        </div>
+        <div class="tile">
+          <div class="top"><span>03</span><span class="ar">9:16</span></div>
+          <div><div class="ttl">Halcyon</div><div>Social · series</div></div>
+        </div>
+        <div class="tile">
+          <div class="top"><span>04</span><span class="ar">2.00:1</span></div>
+          <div><div class="ttl">Sable&nbsp;&amp;&nbsp;Pine</div><div>Documentary</div></div>
+        </div>
+        <div class="tile">
+          <div class="top"><span>05</span><span class="ar">4:3</span></div>
+          <div><div class="ttl">Index</div><div>Music video</div></div>
+        </div>
+        <div class="tile">
+          <div class="top"><span>06</span><span class="ar">2.39:1</span></div>
+          <div><div class="ttl">Verena</div><div>Title sequence</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" id="features" data-ch="5">
+    <div class="col-left" style="grid-row: 1 / span 4; align-self: start; padding-top: 40px;">
+      <span class="label">CH.05 / WHAT WE OBSESS OVER</span>
+    </div>
+
+    <div class="feat reveal">
+      <div class="lab">F.01 · Pacing</div>
+      <h3>Pace is <em>everything.</em></h3>
+      <p>The cut that lands isn&rsquo;t the one that&rsquo;s correct &mdash; it&rsquo;s the one that breathes. We treat runtime like a score: silence, rest, beat.</p>
+      <div class="formula">Δt &asymp; story <small>Rhythm via subtraction</small></div>
+    </div>
+
+    <div class="feat reveal">
+      <div class="lab">F.02 · Color</div>
+      <h3>Color is <em>character.</em></h3>
+      <p>Grade isn&rsquo;t a finishing pass. It&rsquo;s a casting decision. We build LUTs from references that don&rsquo;t exist yet, then sit with them in the dark until they do.</p>
+      <div class="formula">c<sub>i</sub> = f(scene, intent, lens) <small>Color as a function of meaning</small></div>
+    </div>
+
+    <div class="feat reveal">
+      <div class="lab">F.03 · Sound</div>
+      <h3>Sound <em>carries</em> story.</h3>
+      <p>The mix is the second edit. Foley, room tone, the absence of music &mdash; the things audiences never name but always feel.</p>
+      <div class="formula">S<sub>db</sub> &asymp; truth <small>Mix as a structural element</small></div>
+    </div>
+
+    <div class="feat reveal">
+      <div class="lab">F.04 · Decisions</div>
+      <h3>Now <em>37.9%</em> more decided.</h3>
+      <p>We recalibrated our cut&#8209;rate after watching too many edits hedge. Every frame should mean something or get cut. There is no third option.</p>
+      <div class="formula">D = 1 &minus; hedge<sup>2</sup> <small>Decision quotient</small></div>
+    </div>
+  </section>
+
+  <section class="chapter" id="contact" data-ch="6">
+    <div class="col-mid" style="grid-column: 1; text-align:left;">
+      <span class="label">CH.06 / NEXT</span>
+      <h2>Bring us <em>the difficult</em><br/>part of the edit.</h2>
+      <a href="mailto:hello@skald.studio" class="cta">hello@skald.studio &rarr;</a>
+    </div>
+    <div class="col-right meta" style="grid-column: 2;">
+      <div class="row"><span>STUDIO</span><span>Madrid · Lisbon</span></div>
+      <div class="row"><span>EST.</span><span>2021</span></div>
+      <div class="row"><span>WORKING</span><span>Mon&ndash;Thu</span></div>
+      <div class="row"><span>SKALD-01</span><span>v1.0 &mdash; 2026</span></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import * as THREE from 'three';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const canvas = document.getElementById('three');
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+renderer.setSize(window.innerWidth, window.innerHeight, false);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+
+// environment for transmission to work
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envScene = new RoomEnvironment();
+scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+
+// camera
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 0, 14);
+
+// lights (rim light to give the glass character)
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(4, 6, 8);
+scene.add(key);
+
+const rim = new THREE.DirectionalLight(0xd9a373, 1.4);
+rim.position.set(-6, -2, -4);
+scene.add(rim);
+
+const fill = new THREE.DirectionalLight(0x66aaff, 0.4);
+fill.position.set(-3, 4, 6);
+scene.add(fill);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+
+// wordmark group
+const group = new THREE.Group();
+scene.add(group);
+
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0x05050a,
+  transmission: 0.92,
+  thickness: 1.6,
+  ior: 1.52,
+  roughness: 0.06,
+  metalness: 0,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.03,
+  attenuationColor: 0x000000,
+  attenuationDistance: 0.4,
+  envMapIntensity: 1.6,
+  specularIntensity: 1.0,
+  reflectivity: 0.6
+});
+
+const fontUrl = 'https://unpkg.com/three@0.160.0/examples/fonts/helvetiker_bold.typeface.json';
+let textMesh = null;
+
+new FontLoader().load(fontUrl, (font) => {
+  const geo = new TextGeometry('SKALD', {
+    font,
+    size: 2.6,
+    height: 0.85,
+    curveSegments: 12,
+    bevelEnabled: true,
+    bevelThickness: 0.08,
+    bevelSize: 0.05,
+    bevelOffset: 0,
+    bevelSegments: 5
+  });
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  geo.translate(
+    -(bb.max.x + bb.min.x) / 2,
+    -(bb.max.y + bb.min.y) / 2,
+    -(bb.max.z + bb.min.z) / 2
+  );
+  textMesh = new THREE.Mesh(geo, glassMat);
+  group.add(textMesh);
+});
+
+// resize
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// pointer for parallax tilt
+const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
+window.addEventListener('mousemove', (e) => {
+  pointer.tx = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.ty = -((e.clientY / window.innerHeight) * 2 - 1);
+});
+
+// ── scroll-driven scene state ───────────────────────
+const state = {
+  chapter: 0,
+  progress: 0,         // 0..1 within current chapter
+  totalProgress: 0,    // 0..1 across the whole page
+  baseRotY: 0,
+  baseScale: 1
+};
+
+const chapters = Array.from(document.querySelectorAll('.chapter'));
+
+function updateScroll() {
+  const sy = window.scrollY;
+  const docH = document.documentElement.scrollHeight - window.innerHeight;
+  state.totalProgress = Math.min(1, Math.max(0, sy / docH));
+
+  // find active chapter (center of viewport)
+  const midY = sy + window.innerHeight / 2;
+  for (let i = 0; i < chapters.length; i++) {
+    const ch = chapters[i];
+    const top = ch.offsetTop;
+    const bot = top + ch.offsetHeight;
+    if (midY >= top && midY < bot) {
+      state.chapter = i;
+      state.progress = (midY - top) / ch.offsetHeight;
+      break;
+    }
+  }
+
+  // sync nav
+  document.querySelectorAll('.nav a').forEach((a, i) => {
+    a.classList.toggle('active', i === Math.min(state.chapter, 4) ||
+      (i === 4 && state.chapter >= 4));
+  });
+
+  // bbox / annotations visibility per chapter
+  const bbox = document.getElementById('bbox');
+  const annFoot = document.getElementById('ann-foot');
+  const annFormula = document.getElementById('ann-formula');
+  const glow = document.getElementById('glow');
+  const gridbg = document.getElementById('gridbg');
+  const scrollState = document.getElementById('scrollState');
+
+  bbox.classList.toggle('show', state.chapter === 2);             // craft chapter
+  annFoot.classList.toggle('show', state.chapter === 1);          // manifesto
+  annFormula.classList.toggle('show', state.chapter === 4);       // features
+  glow.classList.toggle('on', state.chapter === 1 || state.chapter === 2);
+  gridbg.classList.toggle('on', state.chapter === 4);
+
+  scrollState.textContent = state.chapter < 5 ? 'SCROLL TO CONTINUE' : 'END OF REEL';
+}
+
+// IntersectionObserver for reveal class
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('in');
+  });
+}, { threshold: 0.2 });
+document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+window.addEventListener('scroll', updateScroll, { passive: true });
+updateScroll();
+
+// ── animation loop ───────────────────────────────────
+const clock = new THREE.Clock();
+function tick() {
+  const dt = clock.getDelta();
+  const t = clock.elapsedTime;
+
+  // smooth pointer
+  pointer.x += (pointer.tx - pointer.x) * 0.06;
+  pointer.y += (pointer.ty - pointer.y) * 0.06;
+
+  if (textMesh) {
+    // base rotation drifts gently with time + scroll
+    const totalSpin = state.totalProgress * Math.PI * 1.8;
+    const idleY = Math.sin(t * 0.25) * 0.15;
+    const targetY = idleY + totalSpin + pointer.x * 0.35;
+    const targetX = pointer.y * 0.2 + Math.sin(t * 0.4) * 0.04;
+
+    group.rotation.y += (targetY - group.rotation.y) * 0.08;
+    group.rotation.x += (targetX - group.rotation.x) * 0.08;
+
+    // per-chapter scale + position
+    let targetScale = 1.0;
+    let targetPosY = 0;
+    let targetPosX = 0;
+    let targetPosZ = 0;
+    let targetRoll = 0;
+
+    if (state.chapter === 0) {
+      // hero — large, centered
+      targetScale = 1.0;
+    } else if (state.chapter === 1) {
+      // manifesto — wordmark drifts up & back, becomes a halo behind text
+      targetScale = 0.95 + state.progress * 0.1;
+      targetPosY = 0.4;
+      targetPosZ = -1.5;
+    } else if (state.chapter === 2) {
+      // craft — wordmark pushed slightly off-center, smaller, more presence
+      targetScale = 0.78;
+      targetPosY = -0.2;
+      targetPosX = 0.6;
+    } else if (state.chapter === 3) {
+      // work — wordmark shrinks to corner-ish
+      targetScale = 0.42;
+      targetPosY = 1.3;
+      targetPosX = 2.6;
+    } else if (state.chapter === 4) {
+      // features — wordmark back center, tilted like a blueprint object
+      targetScale = 0.68;
+      targetPosY = 0.2;
+      targetPosX = 1.8;
+      targetRoll = 0.05;
+    } else {
+      // contact — small, top-right
+      targetScale = 0.55;
+      targetPosY = 1.1;
+      targetPosX = -2.4;
+    }
+
+    const lerp = (a, b, k) => a + (b - a) * k;
+    group.scale.setScalar(lerp(group.scale.x, targetScale, 0.06));
+    group.position.y = lerp(group.position.y, targetPosY, 0.06);
+    group.position.x = lerp(group.position.x, targetPosX, 0.06);
+    group.position.z = lerp(group.position.z, targetPosZ, 0.06);
+    group.rotation.z += (targetRoll - group.rotation.z) * 0.06;
+
+    // material breathing — slight thickness pulse in manifesto for drama
+    if (state.chapter === 1) {
+      glassMat.thickness = 1.6 + Math.sin(t * 1.2) * 0.4;
+      glassMat.attenuationDistance = 0.35;
+    } else {
+      glassMat.thickness += (1.6 - glassMat.thickness) * 0.05;
+      glassMat.attenuationDistance += (0.4 - glassMat.attenuationDistance) * 0.05;
+    }
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+
+// ── cursor ──────────────────────────────────────────
+const cdot = document.getElementById('cdot');
+const cring = document.getElementById('cring');
+const spotlight = document.getElementById('spotlight');
+let mx = 0, my = 0, rx = 0, ry = 0;
+window.addEventListener('mousemove', (e) => {
+  mx = e.clientX; my = e.clientY;
+  cdot.style.transform = `translate(${mx}px, ${my}px) translate(-50%, -50%)`;
+  spotlight.style.setProperty('--mx', mx + 'px');
+  spotlight.style.setProperty('--my', my + 'px');
+});
+function ringTick() {
+  rx += (mx - rx) * 0.18;
+  ry += (my - ry) * 0.18;
+  cring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+  requestAnimationFrame(ringTick);
+}
+ringTick();
+document.querySelectorAll('a, button, .tile').forEach(el => {
+  el.addEventListener('mouseenter', () => cring.classList.add('hover'));
+  el.addEventListener('mouseleave', () => cring.classList.remove('hover'));
+});
+</script>
+
+</body>
+</html>
