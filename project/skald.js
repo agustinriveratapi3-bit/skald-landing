@@ -356,11 +356,9 @@ function tick() {
 
   // ── hero overlay (visible during hero-idle, fades as rotation starts) ──
   const heroFadeT = stageActive('hero-idle') ? 1 : clamp(1 - rotP / 0.06, 0, 1);
-  els.heroOverlay.style.opacity = heroFadeT;
   els.heroClaim.style.opacity = heroFadeT;
   els.heroHint.style.opacity = heroFadeT;
   const heroBlur = (1 - heroFadeT) * 8;
-  els.heroOverlay.style.filter = `blur(${heroBlur}px)`;
   els.heroClaim.style.filter = `blur(${heroBlur}px)`;
 
   // ── phrase stage: enters, holds, then shrinks+moves to top-left ──
